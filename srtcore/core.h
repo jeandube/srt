@@ -565,8 +565,10 @@ private: // Identification
     int m_iTsbPdDelay_ms;                           // Rx delay to absorb burst in milliseconds
     int m_iPeerTsbPdDelay_ms;                       // Tx delay that the peer uses to absorb burst in milliseconds
     bool m_bTLPktDrop;                           // Enable Too-late Packet Drop
-    int64_t m_llInputBW;                         // Input stream rate (bytes/sec)
+    int64_t m_llInputBW;                         // Input stream rate (bytes/sec) 
+                                                 // 0: use sampled input bandwidth (sinBW) (internally measured)
     int m_iOverheadBW;                           // Percent above input stream rate (applies if m_llMaxBW == 0)
+    SRT_OUTPACEMODE m_iOutPaceMode;              // Output Pace Mode
     bool m_bRcvNakReport;                        // Enable Receiver Periodic NAK Reports
 private:
     UniquePtr<CCryptoControl> m_pCryptoControl;                            // congestion control SRT class (small data extension)

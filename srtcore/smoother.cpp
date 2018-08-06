@@ -164,8 +164,10 @@ private:
     {
         // packet = payload + header
         double pktsize = m_iSndAvgPayloadSize + CPacket::SRT_DATA_HDR_SIZE;
+        double dOldPktSndPeriod = m_dPktSndPeriod;
         m_dPktSndPeriod = 1000*1000.0 * (pktsize/m_llSndMaxBW);
-        HLOGC(mglog.Debug, log << "LiveSmoother: sending period updated: " << m_iSndAvgPayloadSize);
+        if (fabs(m_dPktSndPeriod - dOldPktSndPeriod) > 1.0 )
+            HLOGC(mglog.Debug, log << "LiveSmoother: sending period updated: pktsz=" << pktsize <<" bw=" << m_llSndMaxBW <<" SndPeriod=" << m_dPktSndPeriod);
     }
 
     void setMaxBW(int64_t maxbw)
