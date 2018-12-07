@@ -7313,7 +7313,7 @@ int CUDT::packData(CPacket& packet, uint64_t& ts_tk)
    uint64_t entertime_tk;
    CTimer::rdtsc(entertime_tk);
 
-#if 1//debug: TimeDiff histogram
+#if 0//debug: TimeDiff histogram
    static int lldiffhisto[23] = {0};
    static int llnodiff = 0;
    if (m_ullTargetTime_tk != 0)
