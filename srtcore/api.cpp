@@ -206,7 +206,11 @@ int CUDTUnited::startup()
 
    m_bClosing = false;
    pthread_mutex_init(&m_GCStopLock, NULL);
-   pthread_cond_init(&m_GCStopCond, NULL);
+
+   pthread_condattr_t  CondAttribs;
+   pthread_condattr_init(&CondAttribs);
+   pthread_condattr_setclock(&CondAttribs, CLOCK_MONOTONIC);
+   pthread_cond_init(&m_GCStopCond, &CondAttribs);
 
    {
        ThreadName tn("SRT:GC");
@@ -1813,11 +1817,9 @@ void* CUDTUnited::garbageCollect(void* p)
        //      self->checkTLSValue();
        //#endif
 
-       timeval now;
        timespec timeout;
-       gettimeofday(&now, 0);
-       timeout.tv_sec = now.tv_sec + 1;
-       timeout.tv_nsec = now.tv_usec * 1000;
+       clock_gettime(CLOCK_MONOTONIC, &timeout);
+       timeout.tv_sec++;
 
        pthread_cond_timedwait(
                &self->m_GCStopCond, &self->m_GCStopLock, &timeout);
