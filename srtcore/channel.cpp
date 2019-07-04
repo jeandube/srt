@@ -234,6 +234,9 @@ void CChannel::setUDPSockOpt()
             //For IPv4mapped-IPv6 accepted connection also set the IPV4 socket.
             if(0 != ::setsockopt(m_iSocket, IPPROTO_IP, IP_TOS, (const char*)&m_iIpToS, sizeof(m_iIpToS)))
                throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
+            //For IPv4mapped-IPv6 accepted connection also set the IPV4 socket.
+            if(0 != ::setsockopt(m_iSocket, IPPROTO_IP, IP_TOS, (const char*)&m_iIpToS, sizeof(m_iIpToS)))
+               throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
          }
       }
 #endif
