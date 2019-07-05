@@ -169,7 +169,9 @@ private:
         double dOldPktSndPeriod = m_dPktSndPeriod;
         m_dPktSndPeriod = 1000*1000.0 * (pktsize/m_llSndMaxBW);
         if (fabs(m_dPktSndPeriod - dOldPktSndPeriod) > 1.0 )
+        {
             HLOGC(mglog.Debug, log << "LiveCC: sending period updated: pktsz=" << pktsize <<" bw=" << m_llSndMaxBW <<" SndPeriod=" << m_dPktSndPeriod);
+        }
     }
 
     void setMaxBW(int64_t maxbw)
