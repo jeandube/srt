@@ -1021,8 +1021,7 @@ void CUDT::getOpt(SRT_SOCKOPT optName, void* optval, int& optlen)
       if((m_llInputBW == 0LL) && m_pSndBuffer){
           //return sampled internally measured input bw
           uint64_t llSmpInputBW, period;
-          int payloadsz; //CC will use its own average payload size
-          llSmpInputBW = m_pSndBuffer->getInputRate(Ref(payloadsz), Ref(period)); //Auto input rate
+          llSmpInputBW = m_pSndBuffer->getInputRate(Ref(period)); //Auto input rate
           if( period != 0) {//sampling active
               *(int64_t*)optval =llSmpInputBW;
           }
@@ -6359,7 +6358,7 @@ void CUDT::updateCC(ETransmissionEvent evt, EventVariant arg)
              * Keep previously set maximum in that case (inputbw == 0).
              */
             if (inputbw != 0 && inputbw > m_llInputBW)
-                m_Smoother->updateBandwidth(0, withOverhead(inputbw)); //Bytes/sec
+                m_CongCtl->updateBandwidth(0, withOverhead(inputbw)); //Bytes/sec
 
             CGuard::enterCS(m_StatsLock);
             if ((m_stats.sentTotal > SND_INPUTRATE_MAX_PACKETS) && (period < SND_INPUTRATE_RUNNING_US))

@@ -605,12 +605,12 @@ void* CSndQueue::worker(void* param)
             }
             else
             {
-#if 1 //duB:debug OutPace
+#if 0 //duB:debug OutPace
                 static uint64_t prev_ots = 0;
                 uint64_t diff_ots;
                 static int prev_its = 0;
                 int its = pkt.getMsgTimeStamp();
-                char *ots_str = " ots: ";
+                const char *ots_str = " ots: ";
                 if ((ts > prev_ots)) {
                     ots_str = " ots: ";
                     diff_ots = ts - prev_ots;
