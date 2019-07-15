@@ -180,7 +180,6 @@ typedef enum SRT_SOCKOPT {
     SRTO_KMREFRESHRATE,   // After sending how many packets the encryption key should be flipped to the new key
     SRTO_KMPREANNOUNCE,   // How many packets before key flip the new key is annnounced and after key flip the old one decommissioned
     SRTO_STRICTENC,       // Connection to be rejected or quickly broken when one side encryption set or bad password
-    SRTO_ROOMFORIPV6ONLY, // unmerged option
     SRTO_OUTPACEMODE
 } SRT_SOCKOPT;
 

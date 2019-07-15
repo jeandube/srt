@@ -209,9 +209,7 @@ void CChannel::setUDPSockOpt()
          {
             if(0 != ::setsockopt(m_iSocket, IPPROTO_IPV6, IPV6_UNICAST_HOPS, (const char*)&m_iIpTTL, sizeof(m_iIpTTL)))
                throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
-            //For IPv4mapped-IPv6 accepted connection also set the IPV4 socket.
-            if(0 != ::setsockopt(m_iSocket, IPPROTO_IP, IP_TTL, (const char*)&m_iIpTTL, sizeof(m_iIpTTL)))
-               throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);         }
+         }
       }   
       if (-1 != m_iIpToS)
       {
@@ -223,9 +221,6 @@ void CChannel::setUDPSockOpt()
          else //Assuming AF_INET6
          {
             if(0 != ::setsockopt(m_iSocket, IPPROTO_IPV6, IPV6_TCLASS, (const char*)&m_iIpToS, sizeof(m_iIpToS)))
-               throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
-            //For IPv4mapped-IPv6 accepted connection also set the IPV4 socket.
-            if(0 != ::setsockopt(m_iSocket, IPPROTO_IP, IP_TOS, (const char*)&m_iIpToS, sizeof(m_iIpToS)))
                throw CUDTException(MJ_SETUP, MN_NORES, NET_ERROR);
          }
       }
