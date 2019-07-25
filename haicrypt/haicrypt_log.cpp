@@ -96,12 +96,16 @@ void HaiCrypt_DumpConfig(const HaiCrypt_Cfg* cfg)
 
     LOGC(hclog.Debug, log << "CFG DUMP: flags=" << cfg_flags.str()
             << " xport=" << (cfg->xport == HAICRYPT_XPT_SRT ? "SRT" : "INVALID")
-            << " cipher="
-            << (cfg->cipher == HaiCryptCipher_OpenSSL_EVP_CTR() ? "OSSL-EVP-CTR":
-                cfg->cipher == HaiCryptCipher_OpenSSL_AES() ? "OSSL-AES":
+            << " cryspr="
+            << (
+#if 0//(defined(USE_OPENSSL)
+                cfg->cryspr == crysprOpenSSLevp() ? "OSSL-EVP-CTR":
+                cfg->cryspr == crysprOpenSSL() ? "OSSL-AES":
                 // This below is used as the only one when Nettle is used. When OpenSSL
                 // is used, one of the above will trigger, and the one below will then never trigger.
-                cfg->cipher == HaiCryptCipher_Get_Instance() ? "Nettle-AES":
+#elif 0//defined(USE_GNUTLS)
+                cfg->cryspr == crysprGnuTLS()() ? "Nettle-AES":
+#endif
                 "UNKNOWN")
             << " key_len=" << cfg->key_len << " data_max_len=" << cfg->data_max_len);
 

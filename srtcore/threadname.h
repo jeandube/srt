@@ -18,6 +18,7 @@ written by
 
 #ifdef __linux__
 
+#include <stdio.h>
 #include <sys/prctl.h>
 
 class ThreadName

@@ -22,10 +22,51 @@ written by
 #include <string.h>
 
 typedef struct tag_crysprGnuTLS_AES_cb {
-        CRYSPR_cb       ccb;        /* CRYSPR control block */
+        CRYSPR_cb       ccb;            /* mandatory 1st field CRYSPR control block */
         /* Add other cryptolib specific data here */
+        struct aes_ctx  aes_kek_buf;    /* Room for KEK */
+        struct aes_ctx  aes_sek_buf[2]; /* Room for odd and even SEKs */
+        // More room allocated here and pointed to by ccb fields
+        // ACtual size depends on CRYSPR supported features (CRYSPR_HAS_...)
 } crysprGnuTLS_cb;
 
+#if CRYSPR_HAS_FIPSMODE
+static int crysprGnuTLS_FipsMode_get(void)
+{
+    int iOnOff = 0;
+
+    unsigned uFipsMode = gnutls_fips140_mode_enabled();
+    switch(uFipsMode) {
+    case GNUTLS_FIPS140_STRICT:
+         iOnOff = 1;
+         break;
+    case GNUTLS_FIPS140_LAX:
+    case GNUTLS_FIPS140_LOG:
+    case GNUTLS_FIPS140_DISABLED:
+    case GNUTLS_FIPS140_SELFTESTS:
+    default:
+        break;
+    }
+    return(iOnOff);
+}
+
+static int crysprGnuTLS_FipsMode_set(bool bOnOff)
+{
+    unsigned uNewFipsMode = (bOnOff ? GNUTLS_FIPS140_STRICT : GNUTLS_FIPS140_LAX);
+    unsigned uOldFipsMode = gnutls_fips140_mode_enabled();
+
+    gnutls_fips140_set_mode (uNewFipsMode, 0);
+    /* above function is no-op if FIPS is not supported,
+       Verify by getting back state
+    */
+    if (uNewFipsMode != gnutls_fips140_mode_enabled()) {
+        HCRYPT_LOG(LOG_ERR, "FIPS mode set %s\n", "failed");
+        return(-1);
+    }
+    //return previous state
+    return(((uOldFipsMode == GNUTLS_FIPS140_DISABLED) || (uOldFipsMode == GNUTLS_FIPS140_LAX)) ? 0 : 1);
+}
+#endif
 
 int crysprGnuTLS_Prng(unsigned char *rn, int len)
 {
@@ -56,7 +97,7 @@ int crysprGnuTLS_AES_SetKey(
 
 int crysprGnuTLS_AES_EcbCipher( /* AES Electronic Codebook cipher*/
     bool bEncrypt,              /* true:encrypt, false:decrypt */
-    CRYSPR_AESCTX *aes_key,     /* CryptoLib AES context */
+    CRYSPR_AESCTX *aes_ctx,     /* CryptoLib AES context */
     const unsigned char *indata,/* src (clear text)*/
     size_t inlen,               /* length */
     unsigned char *out_txt,     /* dst (cipher text) */
@@ -69,7 +110,7 @@ int crysprGnuTLS_AES_EcbCipher( /* AES Electronic Codebook cipher*/
     if (bEncrypt) {
         /* Encrypt packet payload, block by block, in output buffer */
         for (i=0; i<nblk; i++){
-            aes_encrypt(aes_key, CRYSPR_AESBLKSZ, &out_txt[(i*CRYSPR_AESBLKSZ)], &indata[(i*CRYSPR_AESBLKSZ)]);
+            aes_encrypt(aes_ctx, CRYSPR_AESBLKSZ, &out_txt[(i*CRYSPR_AESBLKSZ)], &indata[(i*CRYSPR_AESBLKSZ)]);
         }
         /* Encrypt last incomplete block */
         if (0 < nmore) {
@@ -77,13 +118,13 @@ int crysprGnuTLS_AES_EcbCipher( /* AES Electronic Codebook cipher*/
 
             memcpy(intxt, &indata[(nblk*CRYSPR_AESBLKSZ)], nmore);
             memset(intxt+nmore, 0, CRYSPR_AESBLKSZ-nmore);
-            aes_encrypt(aes_key, CRYSPR_AESBLKSZ, &out_txt[(nblk*CRYSPR_AESBLKSZ)], intxt);
+            aes_encrypt(aes_ctx, CRYSPR_AESBLKSZ, &out_txt[(nblk*CRYSPR_AESBLKSZ)], intxt);
             nblk++;
         }
         if (outlen != NULL) *outlen = nblk*CRYSPR_AESBLKSZ;
     } else { /* Decrypt */
         for (i=0; i<nblk; i++){
-            aes_decrypt(aes_key, CRYSPR_AESBLKSZ, &out_txt[(i*CRYSPR_AESBLKSZ)], &indata[(i*CRYSPR_AESBLKSZ)]);
+            aes_decrypt(aes_ctx, CRYSPR_AESBLKSZ, &out_txt[(i*CRYSPR_AESBLKSZ)], &indata[(i*CRYSPR_AESBLKSZ)]);
         }
         /* Encrypt last incomplete block */
         if (0 < nmore) {
@@ -96,7 +137,7 @@ int crysprGnuTLS_AES_EcbCipher( /* AES Electronic Codebook cipher*/
 
 int crysprGnuTLS_AES_CtrCipher( /* AES-CTR128 Encryption */
     bool bEncrypt,              /* true:encrypt, false:decrypt */
-    CRYSPR_AESCTX *aes_key,     /* CryptoLib AES context */
+    CRYSPR_AESCTX *aes_ctx,     /* CryptoLib AES context */
     unsigned char *iv,          /* iv */
     const unsigned char *indata,/* src */
     size_t inlen,               /* src length */
@@ -104,7 +145,7 @@ int crysprGnuTLS_AES_CtrCipher( /* AES-CTR128 Encryption */
 {
     (void)bEncrypt;             /* CTR mode encrypt for both encryption and decryption */
 
-    ctr_crypt (aes_key,         /* ctx */
+    ctr_crypt (aes_ctx,         /* ctx */
                (nettle_cipher_func*)aes_encrypt, /* nettle_cipher_func */
                CRYSPR_AESBLKSZ,  /* cipher blocksize */
                iv,              /* iv */
@@ -112,6 +153,23 @@ int crysprGnuTLS_AES_CtrCipher( /* AES-CTR128 Encryption */
                out_txt,         /* dest */
                indata);         /* src */
     return 0;
+}
+static CRYSPR_cb *crysprGnuTLS_Open(CRYSPR_methods *cryspr, size_t pkt_maxlen)
+{
+    crysprGnuTLS_cb *gnuTLS_cb;
+
+    gnuTLS_cb = (crysprGnuTLS_cb *)crysprAllocCB(sizeof(crysprGnuTLS_cb), pkt_maxlen);
+    if (NULL == gnuTLS_cb) {
+        HCRYPT_LOG(LOG_ERR, "crysprAllocCB(%zd,%zd) failed\n", sizeof(crysprGnuTLS_cb), pkt_maxlen);
+        return(NULL);
+    }
+    /* Setup the CRYSPR control block key pointers */
+    gnuTLS_cb->ccb.aes_kek = &gnuTLS_cb->aes_kek_buf;
+    gnuTLS_cb->ccb.aes_sek[0] = &gnuTLS_cb->aes_sek_buf[0];
+    gnuTLS_cb->ccb.aes_sek[1] = &gnuTLS_cb->aes_sek_buf[1];
+    gnuTLS_cb->ccb.cryspr=cryspr;
+
+    return((CRYSPR_cb *)gnuTLS_cb);
 }
 
 #ifdef CRYSPR_HAS_PBKDF2
@@ -143,6 +201,9 @@ CRYSPR_methods *crysprGnuTLS(void)
         crysprInit(&crysprGnuTLS_methods); /* Set default methods */
 
         /* CryptoLib Primitive API */
+#if CRYSPR_HAS_FIPSMODE
+        crysprGnuTLS_methods.fips_mode_set  = crysprGnuTLS_FipsMode_set;
+#endif
         crysprGnuTLS_methods.prng           = crysprGnuTLS_Prng;
         crysprGnuTLS_methods.aes_set_key    = crysprGnuTLS_AES_SetKey;
     #if CRYSPR_HAS_AESCTR
@@ -157,8 +218,8 @@ CRYSPR_methods *crysprGnuTLS(void)
     #endif
 
     //--Crypto Session (Top API)
-    //  crysprGnuTLS_methods.open     =
-    //  crysprGnuTLS_methods.close    =
+        crysprGnuTLS_methods.open       = crysprGnuTLS_Open;
+    //  crysprGnuTLS_methods.close      =
     //--Keying material (km) encryption
 #if CRYSPR_HAS_PBKDF2
     	crysprGnuTLS_methods.km_pbkdf2  = crysprGnuTLS_KmPbkdf2;

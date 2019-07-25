@@ -188,6 +188,10 @@ std::string CUDTUnited::CONID(SRTSOCKET sock)
     return os.str();
 }
 
+extern "C" {
+    int crysprFipsModeInit(void);
+}
+
 int CUDTUnited::startup()
 {
    CGuard gcinit(m_InitLock);
@@ -205,7 +209,10 @@ int CUDTUnited::startup()
          throw CUDTException(MJ_SETUP, MN_NONE,  WSAGetLastError());
    #endif
 
-   //init CTimer::EventLock
+   // Set CRYSPR FIPS mode before any thread createion
+   crysprFipsModeInit();
+
+   // CTimer::EventLock
 
    if (m_bGCStatus)
       return true;

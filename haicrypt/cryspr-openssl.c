@@ -18,13 +18,17 @@ written by
 *****************************************************************************/
 
 #include "hcrypt.h"
+#ifndef CRYSPR_FIPSMODE
 
 #include <string.h>
 
 
 typedef struct tag_crysprOpenSSL_AES_cb {
-        CRYSPR_cb       ccb;
-        /* Add cryptolib specific data here */
+        CRYSPR_cb       ccb;    /* Mandatory first field */
+        AES_KEY aes_kek_buf;    /* Room for KEK */
+        AES_KEY aes_sek_buf[2]; /* Room for odd and even SEKs */
+        // More room allocated here and pointed to by ccb fields
+        // ACtual size depends on CRYSPR supported features (CRYSPR_HAS_...)
 } crysprOpenSSL_cb;
 
 
@@ -33,7 +37,7 @@ int crysprOpenSSL_Prng(unsigned char *rn, int len)
     return(RAND_bytes(rn, len) <= 0 ? -1 : 0);
 }
 
-int crysprOpenSSL_AES_SetKey(
+static int crysprOpenSSL_AES_SetKey(
     bool bEncrypt,              /* true Enxcrypt key, false: decrypt */
     const unsigned char *kstr,  /* key sttring*/
     size_t kstr_len,            /* kstr len in  bytes (16, 24, or 32 bytes (for AES128,AES192, or AES256) */
@@ -55,7 +59,7 @@ int crysprOpenSSL_AES_SetKey(
 
 #if !(CRYSPR_HAS_AESCTR && CRYSPR_HAS_AESKWRAP)
 
-int crysprOpenSSL_AES_EcbCipher(
+static int crysprOpenSSL_AES_EcbCipher(
     bool bEncrypt,              /* true:encrypt, false:decrypt */
     CRYSPR_AESCTX *aes_key,     /* CRYpto Service PRovider AES Key context */
     const unsigned char *indata,/* src (clear text)*/
@@ -98,7 +102,7 @@ int crysprOpenSSL_AES_EcbCipher(
 }
 #endif /* !(CRYSPR_HAS_AESCTR && CRYSPR_HAS_AESKWRAP) */
 
-int crysprOpenSSL_AES_CtrCipher(
+static int crysprOpenSSL_AES_CtrCipher(
     bool bEncrypt,              /* true:encrypt, false:decrypt */
     CRYSPR_AESCTX *aes_key,     /* CRYpto Service PRovider AES Key context */
     unsigned char *iv,          /* iv */
@@ -121,6 +125,36 @@ int crysprOpenSSL_AES_CtrCipher(
     return 0;
 }
 
+static CRYSPR_cb *crysprOpenSSL_Open(CRYSPR_methods *cryspr, size_t pkt_maxlen)
+{
+    crysprOpenSSL_cb *openSSL_cb;
+
+    openSSL_cb = (crysprOpenSSL_cb *)crysprAllocCB(sizeof(crysprOpenSSL_cb), pkt_maxlen);
+    if (NULL == openSSL_cb) {
+        HCRYPT_LOG(LOG_ERR, "crysprAllocCB(%zd, %zd) failed\n", sizeof(crysprOpenSSL_cb), pkt_maxlen);
+        return(NULL);
+    }
+    openSSL_cb->ccb.aes_kek = &openSSL_cb->aes_kek_buf;
+    openSSL_cb->ccb.aes_sek[0] = &openSSL_cb->aes_sek_buf[0];
+    openSSL_cb->ccb.aes_sek[1] = &openSSL_cb->aes_sek_buf[1];
+    openSSL_cb->ccb.cryspr=cryspr;
+
+    return((CRYSPR_cb *)openSSL_cb);
+}
+
+static int crysprOpenSSL_Close(CRYSPR_cb *cryspr_cb)
+{
+    crysprOpenSSL_cb *openSSL_cb = (crysprOpenSSL_cb *)cryspr_cb;
+
+    if(openSSL_cb){
+        OPENSSL_cleanse(&openSSL_cb->ccb.aes_kek, sizeof(openSSL_cb->ccb.aes_kek));
+        OPENSSL_cleanse(&openSSL_cb->ccb.aes_sek, sizeof(openSSL_cb->ccb.aes_sek));
+        crysprFreeCB(cryspr_cb);
+        return(0);
+    }
+    return(-1);
+}
+
 /*
 * Password-based Key Derivation Function
 */
@@ -140,25 +174,23 @@ int crysprOpenSSL_KmPbkdf2(
 }
 
 #if CRYSPR_HAS_AESKWRAP
-int crysprOpenSSL_KmWrap(CRYSPR_cb *cryspr_cb,
+static int crysprOpenSSL_KmWrap(CRYSPR_cb *cryspr_cb,
 		unsigned char *wrap,
 		const unsigned char *sek,
         unsigned int seklen)
 {
-    crysprOpenSSL_cb *aes_data = (crysprOpenSSL_cb *)cryspr_cb;
-    AES_KEY *kek = &aes_data->ccb.aes_kek; //key encrypting key
+    AES_KEY *kek = cryspr_cb->aes_kek; //key encrypting key
 
     return(((seklen + HAICRYPT_WRAPKEY_SIGN_SZ) == (unsigned int)AES_wrap_key(kek, NULL, wrap, sek, seklen)) ? 0 : -1);
 }
 
-int crysprOpenSSL_KmUnwrap(
+static int crysprOpenSSL_KmUnwrap(
         CRYSPR_cb *cryspr_cb,
 		unsigned char *sek,             //Stream encrypting key
 		const unsigned char *wrap,
         unsigned int wraplen)
 {
-    crysprOpenSSL_cb *aes_data = (crysprOpenSSL_cb *)cryspr_cb;
-    AES_KEY *kek = &aes_data->ccb.aes_kek; //key encrypting key
+    AES_KEY *kek = cryspr_cb->aes_kek; //key encrypting key
 
     return(((wraplen - HAICRYPT_WRAPKEY_SIGN_SZ) == (unsigned int)AES_unwrap_key(kek, NULL, sek, wrap, wraplen)) ? 0 : -1);
 }
@@ -189,8 +221,8 @@ CRYSPR_methods *crysprOpenSSL(void)
     #endif
 
     //--Crypto Session API-----------------------------------------
-    //  crysprOpenSSL_methods.open     =
-    //  crysprOpenSSL_methods.close    =
+        crysprOpenSSL_methods.open     = crysprOpenSSL_Open;
+        crysprOpenSSL_methods.close    = crysprOpenSSL_Close;
     //--Keying material (km) encryption
 
 #if CRYSPR_HAS_PBKDF2
@@ -211,5 +243,5 @@ CRYSPR_methods *crysprOpenSSL(void)
     }
     return(&crysprOpenSSL_methods);
 }
-
+#endif /* CRYSPR_FIPSMODE */
 

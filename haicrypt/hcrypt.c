@@ -55,7 +55,7 @@ static hcrypt_Session* sHaiCrypt_PrepareHandle(const HaiCrypt_Cfg* cfg, HaiCrypt
     mem_siz = sizeof(hcrypt_Session)	// structure
         + inbuf_siz;
 
-    crypto = malloc(mem_siz);
+    crypto = calloc(1, mem_siz);
     if (NULL == crypto) {
         HCRYPT_LOG(LOG_ERR, "%s\n", "malloc failed");
         return NULL;

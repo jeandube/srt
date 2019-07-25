@@ -27,6 +27,22 @@ written by
 #include <nettle/pbkdf2.h>  //has Password-based Key Derivation Function 2
 //#include <nettle/sha1.h>  //No need for sha1 since we have pbkdf2
 
+#define CRYSPR_NAME "GnuTLS"
+
+#ifdef CRYSPR_FIPSMODE
+/* Define CRYSPR_HAS_FIPSMODE to 1 if this CRYSPR can operate in FIPS 140.2 mode.
+*/
+    #if ((GNUTLS_VERSION_NUMBER >= 0x030602))
+    #define CRYSPR_NAME "GnuTLS-Fips"
+    #define CRYSPR_HAS_FIPSMODE 1
+    #else
+    #error The GnuTLS cryspr FipsMode is supported for GnuTLS since 3.6.2 only
+    #endif
+#else
+#define CRYSPR_NAME "GnuTLS"
+#define CRYSPR_HAS_FIPSMODE 0
+#endif
+
 
 /* Define CRYSPR_HAS_AESCTR to 1 if this CRYSPR has AESCTR cipher mode
    if not set it 0 to use enable CTR cipher mode implementation using ECB cipher mode
@@ -47,12 +63,13 @@ written by
 #define CRYSPR_HAS_PBKDF2 1
 
 /*
-#define CRYSPR_AESCTX to the CRYSPR specifix AES key context object.
-This type reserves room in the CRYPSPR control block for Haicrypt KEK and SEK
-It is set from hte keystring through CRYSPR_methods.aes_set_key and passed
-to CRYSPR_methods.aes_XXX.
+define CRYSPR_AESCTX to the CRYSPR specifix AES key context object.
+It is the responsibility of the CRYSPR to reserve room statically in the control block
+or dynamically in the open method, in both cases the cb pointers for KEK and SEK
+must be set in the open method.
 */
 typedef struct aes_ctx CRYSPR_AESCTX;   /* CRYpto Service PRovider AES key context */
+
 
 struct tag_CRYSPR_methods *crysprGnuTLS(void);
 
