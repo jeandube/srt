@@ -773,6 +773,7 @@ int crysprFipsModeSet(bool bOnOff)
         int rc = cm->fips_mode_set(bOnOff);
         if (rc < 0) { /* -1:failed, 0:previous state Off, 1:previous state On */
             HCRYPT_LOG(LOG_ERR, "Could not %s FIPS mode: %s\n", (CRYSPR_FIPSMODE ?"set": "unset"),"cryspr fips_mode_set failed");
+            return(-1);
         }
         return(rc == 1 ? 1 : 0);
     } else {

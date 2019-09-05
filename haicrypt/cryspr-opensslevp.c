@@ -332,7 +332,7 @@ static int crysprOpenSSLevp_KmSetKey(CRYSPR_cb *cryspr_cb, bool bWrap, const uns
 
 #if CRYSPR_HAS_AESKWRAP
 #if CRYSPR_FIPSMODE
-#error EVP_aes_NNN_wrap does not works in FIPS mode set
+#error EVP_aes_NNN_wrap does not works if FIPS mode set
 #endif
 
 int crysprOpenSSLevp_KmWrap(CRYSPR_cb *cryspr_cb,

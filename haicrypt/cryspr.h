@@ -32,7 +32,16 @@ written by
 #include "haisrt/hcrypt_msg.h"
 #endif
 
-//#define CRYSPR_FIPSMODE 1
+/*
+CRYSPR_VERSION_NUMBER
+    1.0.0: unidentified initial version for mbedTLS support
+    1.1.0: FIPS mode support (FIPS 140-2) for openssl and GnuTLS
+ */
+#define CRYSPR_VERSION_NUMBER  0x010100    /* 1.1.0 */
+
+#if (CRYSPR_VERSION_NUMBER >= 0x010100)
+#define CRYSPR_FIPSMODE 0
+#endif
 
 #if defined(USE_OPENSSL)
 #include "cryspr-openssl.h"
@@ -202,6 +211,7 @@ typedef int (*CRYSPR_MS_DECRYPT_FCT)(
             hcrypt_Ctx *ctx,                                /* HaiCrypt Context (cipher, keys, Odd/Even, etc..) */
             hcrypt_DataDesc *in_data, int nbin,             /* Clear text transport packets: header and payload */
             void *out_p[], size_t out_len_p[], int *nbout); /* Encrypted packets */
+
 
 typedef struct tag_CRYSPR_methods {
         CRYSPR_FIPSMODE_GET_FCT fips_mode_get;
