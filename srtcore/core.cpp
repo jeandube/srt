@@ -3942,7 +3942,18 @@ EConnectStatus CUDT::postConnect(const CPacket& response, bool rendezvous, CUDTE
     m_pRcvQueue->removeConnector(m_SocketID, synchro);
 
     // acknowledge the management module.
-    s_UDTUnited.connect_complete(m_SocketID);
+    try {
+        s_UDTUnited.connect_complete(m_SocketID);
+    }
+    catch (...)
+    {
+        // Simply reject.
+        if ( eout )
+        {
+            *eout = CUDTException(MJ_NOTSUP, MN_SIDINVAL, 0);
+        }
+        return CONN_REJECT;
+    }
 
     // acknowledde any waiting epolls to write
     s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, UDT_EPOLL_OUT, true);
