@@ -5190,11 +5190,14 @@ EConnectStatus CUDT::postConnect(const CPacket &response, bool rendezvous, CUDTE
     s->m_pUDT->m_pSndQueue->m_pChannel->getSockAddr((s->m_SelfAddr));
     CIPAddress::pton((s->m_SelfAddr), s->m_pUDT->m_piSelfIP, m_PeerAddr);
 
+#define PR1695_IN 1 //Apply PR#1695 in my dev-mx4e-outpacemode branch
+
+#if !PR1695_IN
     s->m_Status = SRTS_CONNECTED;
 
     // acknowledde any waiting epolls to write
     s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_CONNECT, true);
-
+#endif
     //int token = -1;
 #if ENABLE_EXPERIMENTAL_BONDING
     {
@@ -5222,6 +5225,13 @@ EConnectStatus CUDT::postConnect(const CPacket &response, bool rendezvous, CUDTE
             g->setGroupConnected();
         }
     }
+#endif
+
+#if PR1695_IN
+    s->m_Status = SRTS_CONNECTED;
+
+    // acknowledde any waiting epolls to write
+    s_UDTUnited.m_EPoll.update_events(m_SocketID, m_sPollID, SRT_EPOLL_CONNECT, true);
 #endif
 
     CGlobEvent::triggerEvent();
